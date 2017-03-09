@@ -1,0 +1,10 @@
+BoldAsFont=yes
+CursorType=block
+CursorBlinks=yes
+FontHeight=12
+ForegroundColour=255,255,255
+BackgroundColour=128,128,255
+AllowBlinking=yes
+BoldAsColour=yes
+CursorColour=255,255,0
+CopyAsRTF=no

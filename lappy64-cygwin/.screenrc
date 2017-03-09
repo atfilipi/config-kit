@@ -1,0 +1,33 @@
+# bind ^A
+# bindkey \241 command
+# escape ''
+# defescape ''
+
+logfile log.%n.%t
+
+# zombie zZ
+
+deflogin off
+defnonblock on
+altscreen on
+hardstatus alwayslastline
+
+termcapinfo xterm* OL=10000
+
+# Prepend/append register [/] to the paste if ^a^] is pressed.
+# This lets me have autoindent mode in vi.
+register [ "\033:se noai\015a"
+register ] "\033:se ai\015a"
+bind ^_ paste [.]
+
+# bind scripts to sync x11 cut/select buffers with screen:
+bind } exec !!! scr2x11
+bind { exec !!! x112scr
+
+vbell off
+startup_message off
+# defmonitor on
+
+caption always
+#caption string '%?%F%{YK}%:%{kK}%? %?%F-----%:     %? %n %t %?%F-----%?'
+caption string '%?%F%{ry}>>%:%{wK}  %? %n %t'

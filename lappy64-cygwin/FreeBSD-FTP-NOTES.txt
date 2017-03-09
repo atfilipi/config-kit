@@ -1,0 +1,48 @@
+for i in {1..15}; do echo ftp$i:; ping -c 10 ftp$i.us.freebsd.org | tail -3; done | tee ftpX.us.freebsd.org.out
+for i in {1..14}; do echo ftp$i:; ping -c 10 ftp$i.freebsd.org | tail -3; done | tee ftpX.freebsd.org.out
+
+{
+    echo "host","rtt min/avg/max/mdev","packet loss"
+    for i in {1..15}; do
+	h=ftp$i.us.freebsd.org 
+	ping -c 10 -q $h | awk '
+	    BEGIN {
+		OFS=","
+		c[1]="n/a"
+	    }
+	    /packet loss/ {
+		c[2]=$6
+	    }
+	    /^rtt/ {
+		c[1]=$(NF-1)" " $NF
+	    }
+	    END {
+		print c[1], c[2]
+	    }
+	'
+	echo $h
+    done | paste -d, - - | sort -n
+} | tee ftpX.us.freebsd.org.out
+
+{
+    echo "host","rtt min/avg/max/mdev","packet loss"
+    for i in {1..14}; do
+	h=ftp$i.freebsd.org 
+	ping -c 10 -q $h | awk '
+	    BEGIN {
+		OFS=","
+		c[1]="n/a"
+	    }
+	    /packet loss/ {
+		c[2]=$6
+	    }
+	    /^rtt/ {
+		c[1]=$(NF-1)" " $NF
+	    }
+	    END {
+		print c[1], c[2]
+	    }
+	'
+	echo $h
+    done | paste -d, - - | sort -n
+} | tee ftpX.freebsd.org.out

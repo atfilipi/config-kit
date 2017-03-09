@@ -1,0 +1,10 @@
+rxvt.font:            Lucida Console-14
+rxvt.boldFont:        Lucida Console-14
+rxvt.scrollBar:       True
+rxvt.visualBell:      True
+rxvt.loginShell:      True
+rxvt.background:      SlateBlue
+rxvt.foreground:      White
+rxvt.saveLines:       3000
+rxvt.cursorColor:     Green
+rxvt.scrollBar_right: True
