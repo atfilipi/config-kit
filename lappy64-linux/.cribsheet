@@ -1,0 +1,2389 @@
+########################################
+# Looking inside a libraries:
+
+    # Basic .a contents:
+    : afilipi@lappy64; ar -tv libasprintf.a
+    rw-rw-r-- 0/0    428 Dec  2 20:59 2011 lib-asprintf.o
+    rw-rw-r-- 0/0   2552 Dec  2 20:59 2011 autosprintf.o
+    # Symbols:
+    nm libasprintf.a
+    # Symbols by file:
+    nm -o libasprintf.a
+    # Undefined symbols:
+    nm -u libasprintf.a
+    # To work with a dynamic library:
+    nm -D libasprintf.so.0.0.0
+
+    # Alternate tools:
+    readelf -s libasprintf.a
+    readelf -s libasprintf.so.0.0.0
+
+
+########################################
+# java keystore commands and jar signing:
+
+    # help on command and subcommands:
+    keytool -help
+    keytool -list -help
+    keytool -genkeypair -help
+    keytool -exportcert -help
+
+    # list 
+    keytool -list
+    keytool -list -v
+    keytool -list -rfc
+
+    keytool -exportcert
+    # view mykey's cert using openssl:
+    keytool -exportcert -alias mykey -file mykey.der
+    openssl x509 -in mykey.der -inform der -text
+    # alternate secquence:
+    keytool -exportcert -alias mykey -rfc | openssl x509 -text
+
+    # Use non-default keystore (~/.keystore):
+    keytool -list -keystore /tmp/keystore.jks
+
+    keytool -certreq > foo.req
+
+    # jarsigner via openssl: http://tinyurl.com/zxv2sme
+    openssl smime -sign -noattr -in META-INF/TEST1.SF \
+	-outform der -out META-INF/TEST1.RSA \
+	-inkey privateKey.pem -signer cert.pem -md sha256
+    # Also see
+    # Creating, Extracting, and Signing JARs: http://tinyurl.com/gnwxz5l
+    openssl pkcs7 -in signature-file.DSA -inform DER -print_certs -text
+
+
+########################################
+# Awk/Gawk file argument techinques:
+
+    # Reread current file in gawk (from texinfo):
+    function rewind(    i)
+    {
+	# shift remaining arguments up
+	for (i = ARGC; i > ARGIND; i--)
+	    ARGV[i] = ARGV[i-1]
+
+	# make sure gawk knows to keep going
+	ARGC++
+
+	# make current file next to get done
+	ARGV[ARGIND+1] = FILENAME
+
+	# do it
+	nextfile
+    }
+
+    # Read first file for data used to when processing other files:
+    awk 'NR==FNR {a[$1]=$2;next} {$3=a[$3]}1' mapfile datafile
+
+    # Change how the same file is handled when read multiple times:
+    awk -F: -v x=1 '
+	BEGIN{print "x="x}
+	BEGINFILE{print "x="x}
+	FNR<10{print $x}
+	ENDFILE{print ""}
+	' x=4 /etc/passwd x=3 /etc/passwd
+
+
+########################################
+# kernel block device partition manipulation example:
+
+    : afilipi@vigor; lsblk /dev/sdj
+    NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+    sdj      8:144  1   3.8G  0 disk
+    |-sdj1   8:145  1    30M  0 part
+    `-sdj2   8:146  1   1.5G  0 part
+    : afilipi@vigor; sudo sfdisk -q -l -uS /dev/sdj
+
+    Disk /dev/sdj: 1019 cylinders, 127 heads, 62 sectors/track
+    Units = sectors of 512 bytes, counting from 0
+
+       Device Boot    Start       End   #sectors  Id  System
+    /dev/sdj1   *      2048     63487      61440  83  Linux
+    /dev/sdj2         63488   3276799    3213312  83  Linux
+    /dev/sdj3             0         -          0   0  Empty
+    /dev/sdj4             0         -          0   0  Empty
+    : afilipi@vigor; sudo addpart /dev/sdj 3 1 2047
+    : afilipi@vigor; sudo sfdisk -q -l -uS /dev/sdj
+
+    Disk /dev/sdj: 1019 cylinders, 127 heads, 62 sectors/track
+    Units = sectors of 512 bytes, counting from 0
+
+       Device Boot    Start       End   #sectors  Id  System
+    /dev/sdj1   *      2048     63487      61440  83  Linux
+    /dev/sdj2         63488   3276799    3213312  83  Linux
+    /dev/sdj3             0         -          0   0  Empty
+    /dev/sdj4             0         -          0   0  Empty
+    : afilipi@vigor; lsblk /dev/sdj
+    NAME   MAJ:MIN RM    SIZE RO TYPE MOUNTPOINT
+    sdj      8:144  1    3.8G  0 disk
+    |-sdj3   8:147  1 1023.5K  0 part
+    |-sdj1   8:145  1     30M  0 part
+    `-sdj2   8:146  1    1.5G  0 part
+    : afilipi@vigor; sudo delpart /dev/sdj 3
+    : afilipi@vigor; sudo delpart /dev/sdj 2
+    : afilipi@vigor; lsblk /dev/sdj
+    NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+    sdj      8:144  1   3.8G  0 disk
+    `-sdj1   8:145  1    30M  0 part
+    : afilipi@vigor;
+
+
+########################################
+# How to flush block cache:
+
+    # from:
+    #	http://unix.stackexchange.com/questions/87908/how-do-you-empty-the-buffers-and-cache-on-a-linux-system
+    # and:
+    #	https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+
+    free && sync && echo 3 > /proc/sys/vm/drop_caches && free
+
+
+########################################
+# WiFi bringup on WRL devices:
+
+    ssid=skynet
+    pswd="I'm afraid I can't do that."
+    pswd=${pswd//[\'.]/^}
+
+    ssid=AE35
+    pswd="come with ME if YOU want to live."
+    pswd=${pswd//[\'.]/^}
+
+    wpa_passphrase ${ssid} "${pswd}" >> /etc/wpa_supplicant.conf
+    wpa_supplicant -B -D wext -i wlan0 -c /etc/wpa_supplicant.conf
+    wpa_cli status
+    dhclient -v wlan0
+
+
+########################################
+# Identifying open network connectin owners:
+
+	# Using ls and /proc:
+	    root@localhost:/root> ls -l /proc/*/fd| head
+	    ....
+	    total 0
+	    lrwx------ 1 root root 64 Mar 28 18:52 0 -> socket:[5611]
+	    lrwx------ 1 root root 64 Mar 28 18:52 3 -> socket:[5604]
+	    l-wx------ 1 root root 64 Mar 28 18:52 4 -> /var/log/httpd
+	    ....
+	    root@localhost:/root>
+
+	# using fuser with a local port:
+	    root@localhost:/proc/net> fuser -v 22/tcp http/tcp
+				 USER        PID ACCESS COMMAND
+	    22/tcp:              root       1014 F.... sshd
+				 root       1319 f.... sshd
+				 root      28464 f.... sshd
+	    http/tcp:            nobody     1248 F.... thttpd
+
+    # using netstat alone:
+	root@localhost:/root> netstat -aneep
+	# using netstat alone:
+	Active Internet connections (servers and established)
+	Proto Recv-Q Send-Q Local Address               Foreign Address             State       User       Inode      PID/Program name
+	tcp        0      0 0.0.0.0:22                  0.0.0.0:*                   LISTEN      0          5276       1014/sshd
+	tcp        0      0 0.0.0.0:443                 0.0.0.0:*                   LISTEN      0          5589       1243/stunnel
+	tcp        0      0 0.0.0.0:1534                0.0.0.0:*                   LISTEN      0          5111       954/tcf-agent
+	....
+
+    # using lsof:
+	root@localhost:/root> lsof -i4
+	COMMAND     PID USER   FD   TYPE  DEVICE SIZE/OFF NODE NAME
+	rpcbind     894  rpc    6u  IPv4    4908      0t0  UDP *:sunrpc
+	rpcbind     894  rpc    7u  IPv4    4912      0t0  UDP *:645
+	rpcbind     894  rpc    8u  IPv4    4913      0t0  TCP *:sunrpc (LISTEN)
+	rpc.statd   912 root    5u  IPv4    4986      0t0  UDP *:664
+	....
+
+########################################
+# Look at slab allocation info:
+
+    sed -n -e 's/tunables //' -e 's/slabdata //' -e '2{s/^# //;s/[<>]//g;p}' \
+	-e '3,$p' /proc/slabinfo | column -t | less -S
+
+
+########################################
+# systemd arcana:
+
+
+https://www.digitalocean.com/community/tutorials/how-to-use-systemctl-to-manage-systemd-services-and-unit
+sudo rm -r /etc/systemd/system/nginx.service.d
+
+    # Find (hopefully) relevant units for tftp:
+	: afilipi@vigor; systemctl list-unit-files '*tftp*'
+	UNIT FILE    STATE
+	tftp.service static
+	tftp.socket  disabled
+
+	2 unit files listed.
+    # See contents of one of the above:
+	: afilipi@vigor; systemctl cat tftp.socket
+	# /usr/lib/systemd/system/tftp.socket
+	[Unit]
+	Description=Tftp Server Activation Socket
+
+	[Socket]
+	ListenDatagram=69
+
+	[Install]
+	WantedBy=sockets.target
+    # Check out properties of the .service:
+	: afilipi@vigor; systemctl show tftp.service -p Id,Names,ExecStart
+	ExecStart={ path=/usr/sbin/in.tftpd ; argv[]=/usr/sbin/in.tftpd -s /var/lib/tftpboot ; ignore_errors=no ; start_time=[Tue 2
+	Id=tftp.service
+	Names=tftp.service
+	: afilipi@vigor; systemctl show tftp.socket -p BindIPv6Only
+	BindIPv6Only=default
+    # Tweak a property:
+#	: afilipi@vigor; sudo systemctl set-property tftp.socket BindIPv6Only=both
+#	# Same but temporary, i.e. stored in /run, not /etc:
+#	: afilipi@vigor; sudo systemctl --runtime set-property tftp.socket BindIPv6Only=both
+    # Rollback to original values:
+	: afilipi@vigor; sudo systemctl revert tftp.socket
+
+    # Check start times:
+    systemd-analyze blame
+
+    # List open sockets:
+    systemctl list-sockets
+    # List installed services:
+    systemctl list-unit-files --type=service
+    # List running services:
+    systemctl list-units --type=service
+
+    # Manipulate the state of a service:
+    systemctl start name.service
+    systemctl stop name.service
+    systemctl restart name.service
+    systemctl reload name.service
+    systemctl status name.service
+    # Start at boot-time:
+    systemctl enable name.service
+    systemctl disable name.service
+    # Prevent a service from running:
+    systemctl mask name.service
+    systemctl unmask name.service
+
+    # Changing run-levels:
+
+	# with X:
+	    systemctl isolate runlevel5.target
+	    systemctl isolate graphical.target
+
+	# with ttys:
+	    systemctl isolate runlevel3.target
+	    systemctl isolate multi-user.target
+
+	# check the run-level (the unpleasant way):
+	    systemctl list-units --type=target
+
+	# check the run-level (the "ok" way):
+	    runlevel
+	    who -r
+
+	# to set the default run-level:
+	    systemctl set-default TARGET.target
+	    # or in a pinch:
+	    cd /etc/systemd/system
+	    ln -s /lib/systemd/system/<target name>.target default.target
+
+sed -i.orig -e '/linux.*bzImage/s/$/ console=ttyUSB0,115200/' /boot/grub/grub.cfg
+systemctl enable console-getty.service
+systemctl disable getty@tty1.service
+systemctl disable serial-getty@ttyS0.service
+
+    # List
+    systemctl list-units --type=target
+    systemctl list-units --type=target --all
+    # List...
+    systemctl list-unit-files
+    systemctl list-unit-files '*console*'
+
+    # Starting a serial gettty
+	systemctl start serial-getty@ttyS0.service
+    # Check status of same port:
+	systemctl status serial-getty@ttyS0.service
+    # Add getty on ttyUBS0:
+    cd /etc/systemd/system/getty.target.wants
+    ln -s \
+	../../../../lib/systemd/system/serial-getty\@.service \
+	serial-getty\@ttyUSB0.service
+    ln -s \
+	../../../../lib/systemd/system/console-getty.service .
+    systemctl enable console-getty.service
+    systemctl disable getty@tty1.service
+    systemctl disable serial-getty@ttyS0.service
+
+    # Set up a non-automatic getty on /dev/tty1:
+    systemctl enable getty@tty1.service
+
+
+    systemctl daemon-reload
+    systemctl start getty@ttyUSB0.service
+
+    # Turn off automatic gettys on vtys:
+    cd /etc/systemd
+    sed -i.orig \
+	-e '/NAutoVTs/{s/^#//;s/=.*/=0/}' \
+	-e '/ReserveVT/{s/^#//;s/=.*/=0/}' \
+	logind.conf
+    systemctl restart systemd-logind.service
+    systemctl disable getty@tty1.service
+
+
+########################################
+# Managing vim annoyances:
+
+    # This is also an example of a way to strip leading spaces
+    # from a here-document:
+    join -a 1 - /dev/null > ~/.vimrc <<EOF
+	syntax off
+	set nohlsearch
+EOF
+
+
+########################################
+# Check tghe OOM settings:
+
+    cd /proc
+    {
+	for i in pid cmd 1/oom_*; do
+	    echo ${i##*/}
+	done | column
+	for i in [1-9]*; do
+	    r=$(readlink $i/exe) || continue
+	    { echo $i ; echo $r; } | paste - - $i/oom_*
+	done
+    } | column -t
+
+
+########################################
+# Restore Firefox session manually:
+
+    cd ~/.mozilla/firefox/*.default
+    # Change source file as appropriate:
+    cp sessionstore-backups/upgrade.js-20160105164030 sessionstore.js
+    cp sessionstore-backups/previous.js sessionstore.js
+    cp sessionstore-backups/recovery.js sessionstore.js
+
+
+########################################
+# Changing my Windows password in Columbia:
+
+    rdesktop -u vmhost -g 1440x900 vmhost
+
+    # Start a shell (bash or cmd) as administrator:
+    route -p ADD 10.0.0.0 MASK 255.0.0.0  192.168.1.99 METRIC 1
+
+    # This might work remotely:
+    # SSH_AUTH_SOCK= ssh vmhost@vmhost
+    # cygstart --action=runas route -p ADD 10.0.0.0 MASK 255.0.0.0  192.168.1.99 METRIC 1
+
+    # Run Remote Dekstop.
+
+	# Host: 10.73.8.30
+	# User: EUROTECH-CMD/adrian.filipi
+
+    # Press Crtl-Alt-End instead of Crtl-Alt-Del to activate
+    # password changing prompt.
+
+########################################
+# Secure erase/Free block clearing tools:
+
+    # non-moving files and partitions:
+	# apt-get install coreutils
+	shred
+
+	# apt-get install wipe
+	wipe
+
+	# apt-get install secure-delete
+	# www.thc.org
+	# https://packages.debian.org/sid/secure-delete
+	srm - files
+	sdmem - memory
+	sswap - swap areas
+	sfill - free blocks
+
+    # ext2/3/4 free blocks:
+	zerofree
+
+    # raw and other devices partitions:
+    # https://code.google.com/p/diskscrub/ 
+	diskscrub
+
+
+########################################
+# Writing images to media under windows:
+
+    Win32DiskImager:
+	http://sourceforge.net/projects/win32diskimager/
+
+
+########################################
+# Make an .ISO bootable hybrid image:
+
+    isohybrid image.iso
+
+
+########################################
+# xterm & X Window:
+
+    # Title management:
+    #   http://invisible-island.net/xterm/xterm.faq.html
+    # Make sure this is resource not disabled:
+    #	allowTitleOps
+    # set title:
+    if [ "$TERM" = "xterm" ]; then
+	PS1="\033]2;\u@\h:\w\007bash$ "
+    fi
+    # get title:
+    current_title=$(xprop -id $WINDOWID | grep WM_NAME | cut -d= -f2)
+
+    # scalable fonts:
+
+	# What's available?
+	fc-list :scalable=true:spacing=mono: family
+
+	# Try it:
+	xterm -fa 'Lucida Console' -fs 12
+	xterm -fa 'Liberation Mono'
+
+
+    # Useful:
+    xlsclients
+    xprop -id $WINDOWID
+    xwininfo
+    wmctrl (add on, window manager interaction)
+    xdotool (add on, automation)
+    xkill (add on)
+
+    # neat stuff:
+    #	http://lukas.zapletalovi.com/2013/07/hidden-gems-of-xterm.html
+    XTerm*on5Clicks: regex ([[:alpha:]]+://)?([[:alnum:]!#+,./=?@_~-]|(%[[:xdigit:]][[:xdigit:]]))+
+    *VT100*translations: #override Shift <Btn1Up>: exec-formatted("google-chrome '%t'", PRIMARY)
+
+
+########################################
+# gnuplot:
+
+    # plot using text mode:
+    set term dumb; set dummy t; plot sin(t)
+    # plot using xterm's Tektronix mode:
+    set term xterm; set dummy t; plot sin(t)
+    # plot using X window:
+    set term wxt; set dummy t; plot sin(t)
+
+
+########################################
+# GitHUB Actions:
+
+    # Importing a project to github:
+    # https://help.github.com/articles/importing-a-git-repository-using-the-command-line/
+    #
+    # Create a new repository on GitHub. called:
+    #
+    #   eurotech/wrl5-eurotech-bsp-layers.git
+    eval $(ssh-agent)
+    ssh-add ~/.ssh/github.dsa
+    git clone --bare wr-eurotech-v8.0.0 wr-eurotech-v8.0.x.git
+    cd wr-eurotech-v8.0.x.git
+    git push --mirror git@github.com:eurotech/wrl5-eurotech-bsp-layers.git
+    cd ..
+    rm -rf wr-eurotech-v8.0.x.git
+
+    # Move working repo to a personal clone:
+    # 1) Fork the repo on github to create:
+    # 	git@github.com:afilipi/wrl5-eurotech-bsp-layers.git
+    # 2) Push master to personal server and set it for our upstream:
+    git push -v -u afilipi master
+
+    # Start with a clone of personal repo and then sync to upstream:
+    # http://stackoverflow.com/questions/7244321/how-to-update-github-forked-repository
+    git clone git@github.com:afilipi/wrl5-eurotech-bsp-layers.git
+    cd wrl5-eurotech-bsp-layers
+    git remote add upstream git@github.com:eurotech/wrl5-eurotech-bsp-layers.git
+    git fetch upstream
+    git checkout master
+    # One of the next two:
+    git rebase upstream/master
+    git merge upstream/master
+    # Now update the fork:
+    git push origin master
+
+
+########################################
+# shell coprocesses
+
+    # Using named pipes manually:
+    mkfifo in out
+    cmd <in >out &
+    exec 3> in 4< out
+    echo data >&3
+    read var <&4
+
+    # bashism
+    coproc cmd
+    echo data >&${COPROC[1]}
+    read var <&${COPROC[0]}
+    # or
+    read -u ${COPROC[0]} var
+    # To put coproc into its own process group, bracket it with 'set
+    # +m;...; set -m' to temporarily reenable job control.
+
+
+########################################
+# Acceptable WiFi signal strengths:
+
+    To maintain a 54Mbps connection you will need at least -50dBm.
+
+	Data_Rate  Received_Signal_Amplitude
+	=========  =========================
+	54Mbps     -50dBm
+	48Mbps     -55dBm
+	36Mbps     -61dBm
+	24Mbps     -65dBm
+	18Mbps     -70dBm
+	12Mbps     -75dBm
+	9MBps      -80dBm
+	6Mbps      -86dBm
+
+
+########################################
+# GNU screen Tips:
+
+    # Make a session write out all its sessions including scrollback buffers:
+    session=test
+    screen -S ${session} -X at \# hardcopy -h
+    mkdir /tmp/${session}
+    screen -S ${session} -X eval "hardcopydir /tmp/${session}"
+    screen -S ${session} -X at \# hardcopy -h
+
+
+########################################
+# WRL5/WRL7/WRL8/Wind River Linux Tips:
+
+    # Build a searchable list of bitbake packages:
+    #
+    # row format:
+    #	recipe_path Package_Name Package_Version Package_split1 split2 etc
+    make dump-pkgs | sed -e "s;.*${PWD}/layers/;;" | sort -k 2 |
+	awk '
+	    {
+		path=$1; sub(/\/[^\/]*$/, "", path)
+		bake=$1; sub(/^.*\//, "", bake)
+		name=$2
+		vers=$3
+		print name":"
+		print "    version: "vers
+		print "    bitbake: "bake
+		print "    path:    "path
+		print "    splits:"
+		fmt="sort | column -c 64 | expand | paste /dev/null -"
+		for (i=4; i<=NF; ++i) {
+		    print $i | fmt
+		}
+		close (fmt)
+		print ""
+	    }
+	' > dump-pkgs.out
+
+
+    # Dump all recipes:
+    make bbc BBCMD="bitbake-layers show-recipes" | tee dump-bbl-recipes.out
+    # Show configured layers and priorities:
+    make bbc BBCMD="bitbake-layers show-layers"
+
+    checkout:
+
+    # Useful to know:
+    make help
+    # Disable "quite" for make:
+    make Q= ${target}
+    # Quicker than "make fs", if you just want to inspect the resulting filesystem:
+    make export-dist
+
+    # Try these?
+    make export-sdk
+    make fs-debug
+    # Make image from tarball instead of export/dist:
+    make IMGARGS="--tarfiles ..." usb-image-loop
+    make bbc BBCMD="create-usb.pl --fileimg --loop --tarfiles"
+
+
+########################################
+# using netconsole
+
+# switch from 'y' to 'm' to be able to load after booting and use modprobe.d.
+CONFIG_NETCONSOLE=m
+# set to 'y' to enable/disable after booting...
+CONFIG_NETCONSOLE_DYNAMIC=y
+# see docs for above...
+
+# syntax:
+#   netconsole=@${target_ip}/,@${syslog_ip}/${syslog_mac}
+
+modprobe netconsole netconsole=@192.168.1.61/,@192.168.1.31/e0:cb:4e:c4:6a:87
+
+# or
+cat > /etc/modprobe.d/netconsole.conf <<EOF
+options netconsole netconsole=@192.168.1.61/,@192.168.1.31/e0:cb:4e:c4:6a:87
+EOF
+
+echo netconsole >> /etc/modules
+
+# add a line like this to the driver source:
+dev_err(&port->dev, "XXX:%s:%d\n", __func__, __LINE__);
+
+add debug options to kernel parameters
+
+# on zest:
+nc -u -l 6666 < /dev/null
+
+
+########################################
+# vlan & alias interfaces
+
+    # add/remove interface for VLAN ID 3:
+    sudo vconfig add eth0 3
+    sudo ifconfig eth0.3 10.78.255.31 netmask 0xffff0000
+    sudo vconfig rem eth0.3
+    # N.B. Nukes existing aliases of same number, e.g. eth0:3.
+
+    # add/remove IP alias interface:
+    sudo ifconfig eth0:3 10.78.255.31 netmask 0xffff0000
+    # N.B. Nukes existing VLANs of same number, e.g. eth0.3.
+
+
+########################################
+# gpio func:
+
+catgpio() {
+    local f="active_low edge value direction"
+    (
+	echo $f
+	echo $(for i in $f; do cat $i; done)
+    ) | column -t
+}
+
+
+########################################
+# Yocto/Pokey/Bitbake Notes
+
+    # Build a package:
+    bitbake ${package}
+    bitbake linux-ti33x-psp
+    bitbake dhcp
+    # Note packages are really recipes and actual packages don't work.  e.g.
+    # bitbake dhcp-client dhcp-server
+
+    # Some have abstract names:
+    bitbake virtual/kernel
+    bitbake virtual/bootloader
+
+    # Build everything:
+    bitbake core-image-basic
+    bitbake eurotech-console-basic
+
+    # Fetch all sources before building:
+    bitbake -c fetchall eurotech-console-basic
+
+    # Build a target task for a package:
+    bitbake virtual/kernel -c menuconfig
+    bitbake virtual/kernel -c devshell
+
+    # Find out what target tasks are supported by a package:
+    bitbake virtual/bootloader -c listtasks
+
+    # Get a development shell in the package working directory:
+    bitbake virtual/bootloader -c devshell
+    # replace shell wish screen including previous shell history:
+    exec screen -S devshell-${PWD##*/}
+
+    # Show the current configured layers:
+    bitbake-layers show-layers
+    layer                 path                                      priority
+    ==========================================================================
+    meta                  /home/afilipi/ltd6/poky/meta              5
+    meta-yocto            /home/afilipi/ltd6/poky/meta-yocto        5
+    meta-oe               /home/afilipi/ltd6/meta-oe/meta-oe        6
+    meta-networking       /home/afilipi/ltd6/meta-oe/meta-networking  5
+    meta-ti               /home/afilipi/ltd6/meta-ti                6
+    meta-mini-gateway     /home/afilipi/ltd6/meta-eurotech/meta-mini-gateway  6
+
+    # Lists available recipes and the layers that provide them:
+    bitbake-layers show-recipes
+
+    # Lists overlayed recipes.  A recipe is overlayed when a recipe with
+    # the same name exists in another layer that has a higher layer
+    # priority.
+    bitbake-layers show-overlayed
+
+    # Lists .bbappend files and the recipe files to which they apply:
+    bitbake-layers show-appends
+
+    set -- $(command ls -t tmp/cache/*/*/bb_cache.dat.*)
+    ../poky/bitbake/contrib/dump_cache.py $1 |
+	sed -e "s;.*${PWD}/layers/;;" | sort -k 2 | awk '
+	    {
+		path=$1; sub(/\/[^\/]*$/, "", path)
+		bake=$1; sub(/^.*\//, "", bake)
+		name=$2
+		vers=$3
+		print name":"
+		print "    version: "vers
+		print "    bitbake: "bake
+		print "    path:    "path
+		print "    splits:"
+		fmt="sort | column -c 64 | expand | paste /dev/null -"
+		for (i=4; i<=NF; ++i) {
+		    print $i | fmt
+		}
+		close (fmt)
+		print ""
+	    }
+	' > dump-pkgs.out
+
+
+    # show the global or per-package environment;
+    bitbake -e (recipe) | less
+    bitbake -e (recipe) | grep ^FILESPATH=' 
+
+    # Building the documentation:
+    cd poky
+    make DOC=bsp-guide
+    make DOC=yocto-project-qs
+    make pdf DOC=poky-ref-manual
+
+    # Project setup:
+    . oe-init-build-env PROJECT_DIR
+    # defaults to "build" under current directory.
+
+    SOURCE_MIRROR_URL ?= "file:///home/rpjday/y/src/dl/"
+    INHERIT += "own-mirrors"
+    BB_GENERATE_MIRROR_TARBALLS = "1"
+    # BB_NO_NETWORK = "1"
+
+    # denerate dependency graph:
+    bitbake -g nbench-byte
+
+    # Example of how to handle multiple checksums in SRC_URI:
+    less $(locate -r $PWD/.*squashfs-tools.*[.]bb)
+    # Also consider the following from
+
+	w3m http://fosiao.com/bitbake/ch03.html
+
+	Non-local downloaded output is placed into the directory specified
+	by the DL_DIR. For non local archive downloads the code can verify
+	sha256 and md5 checksums for the download to ensure the file has
+	been downloaded correctly. These may be specified either in the
+	form SRC_URI[md5sum] for the md5 checksum and SRC_URI[sha256sum]
+	for the sha256 checksum or as parameters on the SRC_URI such as
+	SRC_URI="http://example.com/foobar.tar.bz2;md5sum=4a8e0f237e961fd7785d19d07fdb994d".
+	If BB_STRICT_CHECKSUM is set, any download without a checksum
+	will trigger an error message. In cases where multiple files are
+	listed in SRC_URI, the name parameter is used assign names to
+	the urls and these are then specified in the checksums in the
+	form SRC_URI[name.sha256sum].
+
+
+########################################
+# sed examples (including command grouping)
+
+    http://www.grymoire.com/Unix/Sed.html
+
+    The number flag is not restricted to a single digit. It can be any
+    number from 1 to 512. If you wanted to add a colon after the 80th
+    character in each line, you could type:
+
+    sed 's/./&:/80' <file >new
+
+    If the expression starts with a backslash, the next character is
+    the delimiter:
+
+    sed '\,^#, s/[0-9][0-9]*//'
+    sed '\_/usr/local/bin_ s_/usr/local_/common/all_'
+
+    # command group-ing:
+    http://www.grymoire.com/Unix/Sed.html#uh-35
+    # e.g.:
+	# This is a Bourne shell script that removes #-type comments
+	# between 'begin' and 'end' words.
+	sed -n '
+		1,100 {
+			/begin/,/end/ {
+			     s/#.*//
+			     s/[ ^I]*$//
+			     /^$/ d
+			     p
+			}
+		}
+	'
+
+    # Find a run of "extras=" lines, then add lines below it:
+    i=700140-9405a
+    sudo sed -e '
+	    /^extras=/,/^$/{
+		/^$/i\
+    extras="${extras} '$i'"
+	    }
+	' /mnt/root/{wrl-esf.cfg,wrl-only.cfg}
+
+
+########################################
+# How to use rtcwake:
+
+    # to re-awaken 15 seconds in the future:
+
+	rtcwake --mode mem -s 15
+
+    # same as above, but does not suspend automatically:
+
+	rtcwake --mode no -s 15 # do something.... pm-suspend # wait...
+
+
+########################################
+# How to manually mount LVM partitions after booting:
+
+    : afilipi@zest; sudo vgscan
+      Reading all physical volumes.  This may take a while...
+      Found volume group "VolGroup" using metadata type lvm2
+      Found volume group "vg_zest_home" using metadata type lvm2
+      Found volume group "vg_zest" using metadata type lvm2
+      Found volume group "vg_zest_wruser" using metadata type lvm2
+      Found volume group "vg_zest_afilipi" using metadata type lvm2
+    : afilipi@zest; sudo vgchange -a y VolGroup
+      3 logical volume(s) in volume group "VolGroup" now active
+    : afilipi@zest; sudo mount /dev/VolGroup/lv_home /mnt
+    # Check out /mnt.
+    : afilipi@zest; sudo umount /mnt
+    : afilipi@zest; sudo mount /dev/VolGroup/lv_root /mnt
+    # Check out /mnt.
+    : afilipi@zest; sudo umount /mnt
+    # Release LVM:
+    : afilipi@zest; sudo vgchange -a n VolGroup
+      0 logical volume(s) in volume group "VolGroup" now active
+    # DESTROY WHAT WAS JUST LOOKED AT:
+    : afilipi@zest; sudo vgremove --force VolGroup
+      Logical volume "lv_root" successfully removed
+      Logical volume "lv_home" successfully removed
+      Logical volume "lv_swap" successfully removed
+      Volume group "VolGroup" successfully removed
+    : afilipi@zest; sudo pvremove /dev/sdb3
+      Labels on physical volume "/dev/sdb3" successfully wiped
+    : afilipi@zest;
+
+
+########################################
+# awk one-liners:
+#
+# http://www.catonmat.net/blog/ten-awk-tips-tricks-and-pitfalls/
+
+    # Removes last field and prints the line:
+    awk 'NF--'
+
+    # Read first file for data used to when processing other files:
+    awk 'NR==FNR {a[$1]=$2;next} {$3=a[$3]}1' mapfile datafile
+
+    # transformation with final print:
+    awk '{sub(/HOSTNAME/,"foobar")} {print}'
+    awk '{sub(/HOSTNAME/,"foobar")} 1'		# less obvious version of above
+
+    # prints lines from /beginpat/ to /endpat/, not inclusive:
+    awk '/beginpat/,/endpat/{if (!/beginpat/&&!/endpat/)print}'
+    awk '/endpat/{p=0};p;/beginpat/{p=1}' # equivalent
+    # prints lines from /beginpat/ to /endpat/, excluding /endpat/
+    awk '/endpat/{p=0} /beginpat/{p=1} p'
+    # prints lines from /beginpat/ to /endpat/, excluding /beginpat/
+    awk 'p; /endpat/{p=0} /beginpat/{p=1}'
+    # prints lines from /beginpat/ to /endpat/, inclusive
+    awk '/beginpat/{p=1};p;/endpat/{p=0}'
+
+    # ways to break a file in to parts based upon internal makers (e.g. FOO.*):
+    #
+    # works with all versions of awk:
+    awk -v n=1 '/^FOO[0-9]*/{close("out"n);n++;next} {print > "out"n}' file
+    # needs GNU awk:
+    LC_ALL=C gawk -v RS='FOO[0-9]*\n' -v ORS= '{print > "out"NR}' file
+    # Extract text between HTML/XML tags:
+    gawk -v RS='</?p>' '!(NR%2)' < noindex.html
+    # print exactly parts that match a regex:
+    gawk -v RS='(href|src)="[^"]*"' 'RT{print RT}' < noindex.html
+    # Extract URLs:
+    gawk -v RS='(href|src)="[^"]*"' 'RT{split(RT,S,/"/);print S[2]}' \
+	< noindex.html
+
+
+########################################
+# sed one-liners:
+#
+# http://www.catonmat.net/blog/sed-one-liners-explained-part-one/
+#
+# Also see: ~/docs/sed1line.txt
+
+    # Insert a blank line above every line that matches "regex":
+    sed '/regex/{x;p;x;}'
+    # Insert a blank line below every line that matches "regex":
+    sed '/regex/G'
+    # Insert a blank line above and below every line that matches "regex":
+    sed '/regex/{x;p;x;G;}'
+    # Add a blank line after every five lines:
+    sed 'n;n;n;n;G;'
+
+    # Number each line of a file (named filename). Left align the number:
+    sed = filename | sed 'N;s/\n/\t/'
+    # Number each line of a file (named filename). Right align the number:
+    sed = filename | sed 'N; s/^/     /; s/ *\(.\{6,\}\)\n/\1  /'
+    # Number each non-empty line of a file (called filename):
+    sed '/./=' filename | sed '/./N; s/\n/ /'
+
+    # Align lines right on a 79-column width:
+    sed -e :a -e 's/^.\{1,78\}$/ &/;ta'
+    # Center all text in the middle of 79-column width:
+    sed  -e :a -e 's/^.\{1,77\}$/ & /;ta'
+
+    # Reverse order of lines (emulate "tac" Unix command):
+    sed '1!G;h;$!d'
+    # Reverse a line (emulates "rev" Unix command):
+    sed '/\n/!G;s/\(.\)\(.*\n\)/&\2\1/;//D;s/.//'
+    # Join pairs of lines side-by-side (emulates "paste" Unix command):
+    sed '$!N;s/\n/ /'
+    # Append a line to the next if it ends with a backslash "\":
+    sed -e :a -e '/\\$/N; s/\\\n//; ta'
+    # Append a line to the previous if it starts with an equal sign "=":
+    sed -e :a -e '$!N;s/\n=/ /;ta' -e 'P;D'
+    # Digit group (commify) a numeric string:
+    sed -e :a -e 's/\(.*[0-9]\)\([0-9]\{3\}\)/\1,\2/;ta'
+    # Add commas to numbers with decimal points and minus signs:
+    gsed -r ':a;s/(^|[^0-9.])([0-9]+)([0-9]{3})/\1\2,\3/g;ta'
+
+    # Print the first 10 lines of a file (emulates "head -10"):
+    sed 10q
+    # Print the last 10 lines of a file (emulates "tail -10"):
+    sed -e :a -e '$q;N;11,$D;ba'
+    # Print the last 2 lines of a file (emulates "tail -2"):
+    sed '$!N;$!D'
+    # Print the last line of a file (emulates "tail -1"):
+    sed '$!d'
+    # Print next-to-the-last line of a file:
+    sed -e '$!{h;d;}' -e x
+    # Print the line immediately before regexp, but not the line
+    # containing the regexp:
+    sed -n '/regexp/{g;1!p;};h'
+    # Print one line before and after regexp. Also print the line matching
+    # regexp and its line number. (emulates "grep -A1 -B1"):
+    sed -n -e '/regexp/{=;x;1!p;g;$!N;p;D;}' -e h
+    # Grep for "AAA" and "BBB" and "CCC" in any order:
+    sed '/AAA/!d; /BBB/!d; /CCC/!d'
+    # Grep for "AAA" and "BBB" and "CCC" in that order:
+    sed '/AAA.*BBB.*CCC/!d'
+    # Grep for "AAA" or "BBB", or "CCC":
+    sed -e '/AAA/b' -e '/BBB/b' -e '/CCC/b' -e d
+    # Print a paragraph that contains "AAA". (Paragraphs are separated
+    # by blank lines):
+    sed -e '/./{H;$!d;}' -e 'x;/AAA/!d;'
+
+
+########################################
+# BASH string tricks from:
+#
+#   http://www.catonmat.net/blog/bash-one-liners-explained-part-one/
+#   http://www.catonmat.net/blog/bash-one-liners-explained-part-two/
+#   http://www.catonmat.net/blog/bash-one-liners-explained-part-three/
+#   http://www.catonmat.net/blog/bash-one-liners-explained-part-four/
+
+    # $_ is an ok tossaway variable, thus:
+    wc /etc/motd | read lines words chars _
+
+    # list of iterated values:
+    echo {0..10}
+    # same with padded with 0's:
+    echo {000..10}
+    # joined list of iterated values:
+    printf "%c" {a..z} $'\n'
+    # store printf directly invariable:
+    printf -v alphabet "%c" {a..z}
+    # combinations:
+    echo {a,b,c}{1,2,3}
+    # copies:
+    echo foo{,,,,,,,,,,}
+    # split string:
+    str=foo-bar-baz
+    IFS=- read -r x y z <<< "$str"
+    echo $x $y $z
+    # again, but into array variable:
+    IFS=- read -r -a parts <<< "$str"
+    echo ${#parts[@]} : ${!parts[@]} : ${parts[@]}
+    # split into characters:
+    while IFS= read -r -n 1 c; do
+	echo $c
+    done <<< "$str"
+
+    # string matching without resorting expr or case-statement:
+    # using globbing:
+    if [[ $answer = [Yy]* ]]; then
+	# do something
+    fi
+    # using regular expressions:
+    if [[ $str =~ [0-9]+\.[0-9]+ ]]; then
+	# do something
+    fi
+
+    # extracting substrings
+    str="hello world"
+    echo ${str:6}
+    # output: world
+    echo ${str:7:2}
+    # output: or
+
+    # up/down-case:
+    declare -u str_u
+    str_u=${str}
+    declare -l str_l
+    str_l=${str_u}
+    echo ${str}/${str_u}/${str_l}
+    echo ${str}/${str^^}/${str,,}
+    # combined with globbing string matching example above:
+    declare -u answer
+    read -p "y/n? " answer
+    if [[ $answer = Y* ]]; then
+	# do something
+    fi
+
+    # Reading from a file using an open file descriptor:
+    # Open descriptor:
+    exec 3</etc/passwd
+    # Read once:
+    IFS=: read -u 3 -r n u x
+    echo $n $u $x
+    # output: root x 0:0:root:/root:/bin/bash
+    # Read twice:
+    IFS=: read -r n u x <&3
+    echo $n $u $x
+    # output: bin x 1:1:bin:/bin:/sbin/nologin
+    # Read 10 characters:
+    read -u 3 -n 10 x
+    echo $x
+    # output: daemon:x:2
+    # Read rest of line:
+    read -u 3 y
+    echo $y
+    # output: :2:daemon:/sbin:/sbin/nologin
+    # Close descriptor:
+    exec 3>&-
+    # Try to read again:
+    IFS=: read -u 3 -r n u x
+    # output: bash: read: 3: invalid file descriptor: Bad file descriptor
+
+    # Use named descriptors:
+    exec {filew}>output_file
+    echo foobar >&${filew}
+    exec {filew}>&-
+    echo foobar >&${filew}
+    cat output_file
+
+    # Read from pipe/socket without blocking:
+    exec 3<>/dev/tcp/www.google.com/80
+    echo -e "GET / HTTP/1.1\n\n" >&3
+    sleep 1
+    prefix=HEAD
+    while read -t 0 -u 3; do
+	read -u 3 x
+	if [ "$x" = $'\r' ]; then
+	    prefix=BODY
+	    continue
+	fi
+	printf "${prefix}: %.70q\n" "$x"
+    done
+    exec 3>&-
+
+    # See what processes have descriptors open:
+    fuser /dev/fd/*
+    # output: Cannot stat /dev/fd/255: No such file or directory
+    # output: Cannot stat /dev/fd/255: No such file or directory
+    # output: /dev/fd/0:            1630
+    # output: /dev/fd/1:            1630
+    # output: /dev/fd/2:            1630
+    # output: /dev/fd/3:            1630
+
+
+
+
+
+
+
+########################################
+# Detailed tracing of BASH scripts using PS4:
+
+N.B. First character of PS4 is repeated to indicate subshell nesting depth.
+
+export PS4
+PS4='$(printf ": TRACE : %16s:% 5d\n" ${FUNCNAME[0]:-main} ${LINENO} | unexpand -a); '
+bash -x script.sh
+
+# above subshell appears to cause problems with 'set -e'
+def_PS4='$(
+        printf ": TRACE : %16s:% 5d\n" \
+            ${FUNCNAME[0]:-main} ${LINENO} | unexpand -a
+    ); '
+PS4="${PS4:-${def_PS4}"
+PS4=': TRACE: ${FUNCNAME[0]:-main}: ${LINENO}; '
+
+# simple option:
+PS4=$(printf "+\t%d: " ${LINENO})
+
+########################################
+# how to copy a directory hierarchy using hard links:
+
+    find ${src} -print | cpio -dpl ${dst}
+    # Not sure if this is identical to the above, and it's specific to GNU cp:
+    cp -al ${src} ${dst}
+
+
+########################################
+# udev tips
+
+    # Get device path for given /dev node:
+    udevadm info -q path -n /dev/sdz
+
+    # Get device properties as shell syntax variables:
+    udevadm info --export --query=property --name=/dev/sdj
+
+    # Prevent udevd from interrupting sfdisk:
+    udevadm control --stop-exec-queue
+    echo ,, |  sfdisk /dev/sdX
+    udevadm control --start-exec-queue
+    # Prevent anything from accessing devices, before udevd is caught up:
+    udevadm settle
+
+    # blacklisting:
+	# Take your stinking paws off my partitions, you damned dirty ape!
+	for i in /dev/loop /dev/mmcblk /dev/sd; do
+	    if ! grep -q $i /etc/udev/mount.blacklist; then
+		echo $i >> /etc/udev/mount.blacklist
+	    fi
+	done
+
+    # Get info about a given device and its parents:
+    udevadm info -a -p $(udevadm info -q path -n /dev/sdb)
+
+    # Watch what's happening:
+    udevadm monitor [--property]
+
+    # Trigger an rule:
+    p=$(udevadm info -q path -n /dev/sda)
+    udevadm trigger --action=add -p $p
+
+    # Capture the environment seen by a "RUN" command, e.g. epr-updater:
+    ACTION=="add", ENV{ID_FS_LABEL_ENC}=="epr-updater", TAG="epr-updater", \
+	RUN+="/bin/bash -c '/usr/bin/env > /tmp/udev.env'"
+
+
+########################################
+# Dump/Access contents of virtual tty/console:
+
+    # cooked:
+    setterm -file log.txt -dump 1
+
+    # raw:
+    cat /dev/vcs1
+
+
+########################################
+# Instantiating I2C devices:
+
+    modprobe ds28cm00
+    echo dsc28cm00 0x50 > /sys/bus/i2c/devices/i2c-0/new_device
+    echo 0x50 > /sys/bus/i2c/devices/i2c-0/delete_device
+    modprobe -r ds28cm00
+
+    : gpio; modprobe pca953x
+    : gpio; echo pca9535 0x27 > /sys/bus/i2c/devices/i2c-0/new_device
+
+    see:
+	http://www.spinics.net/lists/linux-i2c/msg06862.html
+	http://www.mail-archive.com/linux-i2c@vger.kernel.org/msg03531.html
+	https://forum.openwrt.org/viewtopic.php?pid=147538
+	http://www.spinics.net/lists/linux-i2c/msg05799.html
+	http://www.spinics.net/lists/linux-i2c/msg02022.html
+
+
+
+
+########################################
+# set xterm title from CLI:
+
+    # Figure out Window ID, then:
+    xprop -id 0x5000022 -set WM_NAME foobar
+
+
+########################################
+# Tools to Probe the System:
+
+    # Check the BIOS version and more:
+    sudo dmidecode
+
+    # Get the NIC driver and firmware info:
+    eththool -i eth0
+
+    # Dump the first 4 COM ports from the BIOS Data Area (BDA):
+    sudo dd bs=1 skip=1024 count=8 if=/dev/mem | hexdump
+	# Standard Defaults look like this:
+	# 4+0 records in
+	# 4+0 records out
+	# 16 bytes (16 B) copied, 0.000115657 s, 138 kB/s
+	# 0000000 03f8 02f8 03e8 02e8
+	# 0000008
+
+    # Get display capabilties:
+    sudo get-edid | parse-edid
+
+
+########################################
+# Running an image under qemu:
+
+    # To set a preferred boot device, use "-boot c|d".  c=disk, d=cdrom
+
+    # USB as DISK: 
+    sudo qemu-kvm -smp 4 -m 2047 -hda eurotech_ec-usb.img
+
+    # ISO:
+    sudo qemu-kvm -smp 4 -m 2047 -cdrom export/eurotech_ec-boot.iso
+
+    # Both with a disk to install to:
+    truncate -s 1G DISK
+    sudo qemu-kvm -smp 4 -m 2047 \
+	-hda DISK \
+	-hdb export/eurotech_ec-usb.img \
+	-cdrom export/eurotech_ec-boot.iso
+
+
+########################################
+# Setup FreeDOS infrastructure to make bootable USB sticks:
+
+    # Following notes from:
+    # 	http://wiki.fdos.org/Installation/BootDiskCreateUSB
+
+    # Where we accumilate the fs image files:
+    mkdir ~/FreeDOS/fs-root
+    cd ~/FreeDOS
+
+    # From the FreeDOS 1.0 ISO, fdfullcd.iso:
+    zips="commandx.zip kernels.zip unstablx.zip"
+    for i in ${zips}; do
+	d=${i%.zip}
+	mkdir $d
+	(
+	    cd $d
+	    unzip ../$i
+	)
+    done
+    cp $(find . -name fat??.bin) .
+    cp $(find . -name fat32lba.bin) .
+    cp $(find . -name command.com) .
+    cp $(find . -name kernel.sys) .
+    cp command.com kernel.sys fs-root
+
+    # From syslinux package:
+    cp /usr/share/syslinux/mbr.bin .
+    # From makebootfat package:
+    cp /usr/share/makebootfat/x86/mbrfat.bin .
+
+
+########################################
+# Hot to make FreeDOS images and flash drives:
+
+    # Make a 50MiB empty FAT32 hard drive (partitioned) image:
+    img=hd-50MB-FAT32.img
+    truncate -s 50MiB ${img}
+    sudo losetup -vf ${img}
+    # Probably get loop0, but pay attention!
+    sudo makebootfat -v \
+	-o /dev/loop0 \
+	-E 255  \
+	-b fat32lba.bin \
+	-m mbr.bin \
+	fs-root
+    sudo losetup -d /dev/loop0
+
+    # Make a 50MiB empty FAT32 floppy drive (non-partitioned) image:
+    img=fd-50MB-FAT32.img
+    truncate -s 50MiB ${img}
+    sudo losetup -vf ${img}
+    # Probably get loop0, but pay attention!
+    sudo makebootfat -v \
+	-o /dev/loop0 \
+	-E 255 \
+	-b fat32lba.bin \
+	fs-root
+    sudo losetup -d /dev/loop0
+
+    # Make a FreeDOS bootable USB (partitioned) stick:
+    cd ~/FreeDOS
+    sudo makebootfat -v \
+	-o usb \
+	-E 255 \
+	-1 fat12.bin -2 fat16.bin -3 fat32lba.bin -m mbr.bin \
+	fs-root
+
+    # Make a FreeDOS bootable USB (non-partitioned) stick:
+    cd ~/FreeDOS
+    sudo makebootfat -v \
+	-F \
+	-o usb \
+	-E 255 \
+	-1 fat12.bin -2 fat16.bin -3 fat32lba.bin -m mbr.bin \
+	fs-root
+
+
+########################################
+# Updating a WRL kernel and modules:
+
+    tgt=dyn87
+
+    # scp export/*bzImage* export/RPMS/*/*kernel-2.6* ${tgt}:
+    scp export/*bzImage* export/RPMS/*/*kernel-v2.6* ${tgt}:
+    ssh ${tgt}
+
+    # The kinst.sh script:
+openssl base64 -d <<EOF | gunzip > kinst.sh
+    H4sIAH2LaVICA62QPW+DMBiEd/+KK0FKQTVWOnRIgtQllTJFYm07GHDAKsYUO+pH
+    mv9eg0MydK2n0/kev+d3dsNy2bKcm5oQIywoRZx/bxWvRDwZ4W2hleJticaA2gWC
+    8DGIiNzjGeEMtLJY4HUFW4uWwB1R1BrBJst22RJWazj4C+dnTeAzn9JhZC/Jm+hb
+    0aTh4trAWzS+Tx7+u4XS5aER6Dv1p4i7cvZYpOAW6/Vm90S2rbG8aWRbLcf41Pbo
+    xWk0J/LoxYmQASXSs6AKh7T/uKt02uNCguVaW+LyoMJ9bxTvHD+oetGdB9FkWILz
+    jCiH2Nywl4RbrRibR56VuM4tRefksKsSrJE58981K7+NOCK/82FYJPIBAAA=
+EOF
+
+    # Installing new kernels on Target:
+    bash ./kinst.sh
+
+
+########################################
+# Mount the WRL LiveUSB image and retreive the recovery image:
+
+    sudo lunge mount DVD-R158732.1-1.img
+    # cd /mnt/module/eurotech_helios_WRLX302_WS/src/fs/workspace/WRLinux-Platform
+    cd /mnt/module/mod_f11_isis_workspace/src/fs/workspace/WRLinux-Platform
+    cp -p recovery-usb.img ~/LiveUSB
+    sudo lunge umount
+
+    # To just mount the image w/o using lunge and see the VFAT stuff:
+    sudo mount -o loop,offset=32256 DVD*.img /mnt
+
+
+########################################
+# Reset the state of a WRL LiveUSB stick:
+
+    mount vfat partition and  touch the file "reset_overlay".
+
+
+########################################
+# Make a bootable WRL ISO/USB image including installation tarballs:
+
+    Add this to the configure command:
+
+	--enable-bootimage=iso
+
+    make fs
+    mkdir -p templates/default/fs/opt
+    cp export/*bzImage* templates/default/fs/opt/
+    cp export/*dist.tar.bz2 templates/default/fs/opt/
+    make reconfig
+    make boot-image
+
+    # make boot-image is defined as:
+    make -C build linux.build
+    make fs
+    make boot-image-create
+
+
+########################################
+# Techniques for tracing/debugging GNU Make:
+
+
+# tracing...
+http://www.cmcrossroads.com/ask-mr-make/6535-tracing-rule-execution-in-gnu-make
+
+    OLD_SHELL := $(SHELL)
+    SHELL = $(warning Building $@)$(OLD_SHELL)
+    # SHELL = $(warning Building $@$(if $<, (from $<))$(if $?, ($? newer)))$(OLD_SHELL)
+    # SHELL = $(warning Building $@$(if $<, (from $<))$(if $?, ($? newer)))$(OLD_SHELL) -x
+
+    The first line is the output of the $(warning) produced when the pattern
+    rule to build foo.o is about to be executed. Since there's no Makefile
+    and line number information we know that a built-in rule was used.
+
+	.PHONY: all
+	all: foo.o bar
+
+	bar:
+	    @touch $@
+
+    Running GNU Make now produces really useful information:
+
+	make: Building foo.o
+	cc -c -o foo.o foo.c
+	Makefile:7: Building bar
+
+    The first line is the output of the $(warning) produced when the
+    pattern rule to build foo.o is about to be executed. Since there's
+    no Makefile and line number information we know that a built-in rule
+    was used.
+
+# printing variables....
+http://www.cmcrossroads.com/ask-mr-make/6526-printing-the-value-of-a-makefile-variable
+
+    Add this rule or put in a file called helper.mk:
+
+	print-%:
+		@echo $* = $($*)
+		@echo $*\'s origin is $(origin $*)
+
+    Then run one of these:
+
+	make print-X
+	make -f Makefile -f helper.mak print-X
+	make -f Makefile -f ~/eg/gmake/helpers.mk print-X
+
+    Also added "printvars" target to helpers.mk:
+
+	make -f Makefile -f ~/eg/gmake/helpers.mk printvars
+
+
+########################################
+# update u-boot via tftp:
+
+    # NOR Flash
+    setenv tftp 'setenv serverip ${tftp_server}; setenv ipaddr ${tftp_client}; set ethaddr ${tftp_nicmac}; tftpboot scratch_buffer ${tftp_file}'
+    setenv inst 'protect off all && erase ${part} && cp.b scratch_buffer ${part} ${filesize}'
+    setenv tup  'run tftp && run inst'
+
+    # NAND Flash
+    #setenv load_dram_tftp 'load_buffer=scratch_buffer && echo tftp:${load_file} -> dram:${load_buffer} && setenv serverip ${tftp_server}; setenv ipaddr ${tftp_client}; tftpboot ${load_buffer} ${load_file}'
+    #setenv load_dram      'load_buffer=scratch_buffer && dhcp ${load_buffer} ${tftp_server}:${load_file}'
+    setenv load_dram      'load_buffer=scratch_buffer && dhcp 0x80308000 ${tftp_server}:${load_file}'
+    setenv tup  'run load_nand'
+
+    # netboot kernel:
+    setenv tbt  'setenv serverip ${tftp_server}; setenv ipaddr ${tftp_client}; set ethaddr ${tftp_nicmac}; tftpboot zImage_buffer zImage.${board}'
+    setenv boot_linux 'test -n ${hw_config} && run hw_config; run tbt; bootm zImage_buffer'
+
+    # netboot kernel and ramdisk:
+    setenv trd  'setenv serverip ${tftp_server}; setenv ipaddr ${tftp_client}; set ethaddr ${tftp_nicmac}; tftpboot ramdisk.gz ramdisk.gz-armel'
+    setenv trd  'setenv serverip ${tftp_server}; setenv ipaddr ${tftp_client}; set ethaddr ${tftp_nicmac}; tftpboot ramdisk.gz ramdisk.gz'
+    setenv tbt  'setenv serverip ${tftp_server}; setenv ipaddr ${tftp_client}; set ethaddr ${tftp_nicmac}; tftpboot zImage_buffer zImage.${board}'
+    setenv boot_linux 'test -n ${hw_config} && run hw_config; run trd; run tbt; bootm zImage_buffer'
+    setenv root_args rw root=/dev/ram initrd=${INITRD},5m ramdisk_size=12288 rootfstype=ext2
+    setenv mtd_args mtdparts=flash0:${FLBLOCKSZ}(boot),${FLBLOCKSZ}(bootvars),2048k(zImage),5m(ramdisk.gz),-(flashfs1)
+    setenv bootargs ${tty_args} ${root_args} ${mtd_args} ${install_args}
+
+    setenv uinst 'nand erase 0x20000 ${filesize} && nand write 0x80208000 0x20000 ${filesize}'
+
+    # using daft:
+    setenv tftp_server 192.168.1.48	
+    setenv tftp_client 192.168.1.222
+
+    # using adsfarm:
+    setenv tftp_server 192.168.3.99
+    setenv tftp_client 192.168.3.nn
+
+# NOR Flash
+setenv tftp_file u-boot.${board}    && setenv part boot
+setenv tftp_file zImage.${board}    && setenv part zImage
+setenv tftp_file ramdisk.gz         && setenv part ramdisk.gz
+setenv tftp_file flashfs1           && setenv part flashfs1
+setenv tftp_file flashfs1-armel     && setenv part flashfs1
+setenv tftp_file empty.jffs2        && setenv part flashfs1
+
+# NAND Flash
+setenv load_file ${kernel}.${board} && setenv nand_partition kernel
+setenv load_file u-boot.${board} && setenv nand_partition boot
+
+# DHCP commands:
+dhcp kernel_buffer 192.168.1.48:${kernel}.${board}
+# If on same sever as dhcp:
+dhcp kernel_buffer ${kernel}.${board}
+
+setenv autoload no
+dhcp
+# If tftp not same as dhcp server:
+setenv serverip 192.168.1.48
+dhcp kernel_buffer ${kernel}.${board}
+
+#########################################
+# Set up sshd on a board for easy remote access:
+#
+
+    mkdir ~/.ssh
+    cd ~/.ssh
+    (
+	while read; do
+	    echo -n "${REPLY}"
+	done
+	echo
+    ) <<'EOF' > authorized_keys
+ssh-dss AAAAB3NzaC1kc3MAAAEBALlDiRx0Uqp5aqGzx5tjzMekzjaI5JTw
+siTAbS+qqIBb1Rek72ZtL+LqqJDE0pPCJM0VZghcLPcB+BCYJmiBZiEcVO4W
+Mas+9zs5KKBxEaBNfazJqtlDyTRyRg+P/kvrdq+jT0vEhMUZGgv5xfNYdXIs
+GS8LrMm5GvQzsisbmM9O3J1gERDZ3evbAXQz3xW1cBd/0VB2A84m+V8UGcuK
+bV6aa5X3ZURB78GifJEafmJBb0L/XQHATwgvqftn2Io8Zls0zwqTDfHWGnf8
+K7WC0Il5u203ITtuS6oDrAktitU5HKYyeF9T8OyxyNUvnlZcgy1BYQu0AWUI
+FzMH++qkhYMAAAAVANkuClL9Wmvt930m6i/2zM1/MMu7AAABAC5zggnFnQeo
+WZi+dbmfruJ5lML1tOLWQXNuYH4Irq8M7iDAmdlArV7X/ZzvE1BvAKSgwMVw
+KZ6+DCMEd3eUxvH1PzY7cD9Oug6ISzz1ScCZd4elqLiDM8chsHbrnNERbH15
+uTR2+OTZiMANqpSj/xdlJsIOmcJ9oyvv4YneVf+fcYpXAeHf+D4bVaT0j/7h
+3AHnq21qnQuQ7UsBsD+MHWHw9R//SWc8ZkMfMqVQfbzhCS+07vYTzlRtsZde
+Svcw6nK9yXZQUkZdJS4Mo0zYuORiBtAf6mFX0OEEV3/olM2R42wmM4f4coze
+tummb/t+fwgZea0JDaigYlCFYyV17mYAAAEASEtmVnsrTR1u009UKXK3OT+v
+aaZuP12oP1OybpMw/tbkMT3XXGUPz5G+o97cL5B2vSUyEFslCBDnTayhdzY1
+NG38LCOv5HC6PHs9rXgD7wX/VYI6gHqDp3aNQNHBUc0pb8w/nSLtytDUemkA
+rhnATXhADpVRxD8vfOQHXjj5hCb3SC5gEmIduy3d/QthU2URMKbh7HHsK78F
+wa3ynMSw2Rwl6FUUinkZ6lq1JhDFJRhDjVUhC2Hgv3rkYNXo0hxig6CcrMgz
+fAdR3uUeF2tJRQA04v+RMwWZ7q1ZHAR8BDl2JEatVOF5nxjXswWJIYUAiryN
+jkSSlJiMNHvnvIJsOQ== afilipi@pmy
+EOF
+
+    for i in 2 3; do
+    	( cd /etc/rc$i.d && ln -sf ../init.d/ssh S99ssh )
+    done
+    /etc/init.d/ssh start
+
+    sed -i -e '/pam_unix.so/s/$/ nodelay/' /etc/pam.d/common-*
+
+
+#########################################
+# Sync'ing ~/refs and ~/dists:
+#
+
+# server -> zest
+rsync -n --delete -Pai server:refs ~
+# wrl only:
+rsync -n --delete -Pai \
+    server:/home4/archives/dists/wrl /home/data/dists
+# wrl only from support laptop:
+rsync -n --delete -Pai --inplace \
+    --exclude=lost+found \
+    support:/mnt/ /home/data/dists/wrl
+
+# zest -> server
+rsync -n --delete -Pai ~/refs server:
+# wrl only:
+rsync -n --delete -Pai \
+    --exclude=*.{img,iso} \
+    /home/data/dists/wrl server:/home4/archives/dists
+# wrl to support laptop under /mnt:
+rsync -n --delete -Pai --inplace \
+    --exclude=lost+found \
+    --chmod=Dg+s,ug+w,o-w,+r,+X \
+    /home/data/dists/wrl/ support:/mnt
+
+
+#########################################
+# Linux:
+#
+
+# turn off automatif fsck'ing under linux:
+
+    tune2fs -c 0 -i 0 /dev/sda5
+
+# build a module w/details:
+
+    KBUILD_VERBOSE=1 make drivers/video/juneau.o
+
+# boot kernel and userland w/debugging verbosity:
+
+    For timestamps, add the following to command-line:
+
+	printk.time=y
+
+    Add the following to command-line:
+
+	debug dynamic_printk BOOTUP=verbose LOGLEVEL=8
+
+    The last two options can also be added to /etc/sysconfig/init.
+
+    To use dynamic debugging (dynamic_printk), the kernel must be built with:
+
+	# /Kernel hacking
+	#   /Enable dynamic printk() support
+	CONFIG_DYNAMIC_DEBUG
+
+    To turn on dynamic debugging (dynamic_printk) for a module, use:
+
+	mount -t debugfs none /sys/kernel/debug
+	# To automate add this to /etc/fstab:
+	#    debugfs /sys/kernel/debug debugfs 0 0
+
+
+# copy zImage to cfmedia:
+
+    sudo mount /media/cflash &&
+	sudo cp --preserve=timestamps arch/arm/boot/zImage /media/cflash &&
+	sudo umount /media/cflash
+
+# How to identify EABI/armel systems:
+
+	readelf -h /some/binary
+	objdump -h /some/bniary
+	dpkg --print-architecture
+
+    2) If you have some .deb packages in the apt archive, you can do
+    "ls /var/cache/apt/archives" - if the files end with arm.deb you're
+    running arm, if they end with armel.deb you're running armel.
+
+# Preparing a kernel source tree for building a module:
+
+    make {oldconfig|adsxxx_defconfig} prepare scripts
+
+
+#########################################
+# Setup a local git repository w/branches from other repositories:
+#
+
+    cd ~/repo-git
+    git clone git://git.denx.de/u-boot.git            u-boot
+    cd u-boot
+
+    # git config remote.arm.url git://git.denx.de/u-boot-arm.git
+    # git config remote.cfi-flash.url git://git.denx.de/u-boot-cfi-flash.git
+    # git config remote.nand-flash.url git://git.denx.de/u-boot-nand-flash.git
+
+    git fetch git://git.denx.de/u-boot-arm.git        master:arm
+    git fetch git://git.denx.de/u-boot-nand-flash.git master:nand-flash
+    git fetch git://git.denx.de/u-boot-cfi-flash.git  master:cfi-flash
+    git fetch git://git.denx.de/u-boot-usb.git        master:usb
+    git fetch git://git.denx.de/u-boot-v2.git         master:v2
+
+    git branch -l -r
+      arm
+      cfi-flash
+    * master
+      nand-flash
+      usb
+
+
+#########################################
+# Useful MAC Addreess:
+#
+
+    00:60:0C	- Eurotech, Inc. vendor OUI/prefix
+    00:E0:C7 	- Eurotech, SpA. vendor OUI/prefix
+
+    02:00:00	- a locally administered MAC sets this bit
+
+
+#########################################
+# Reformat diff/patch into git-diff/patch format:
+#
+
+    filterdiff \
+	--strip=1 --addoldprefix=a/ --addnewprefix=b/ \
+	--remove-timestamps < org.diff > new.diff
+
+
+#########################################
+# Git Tips:
+#
+
+    # Convert working repo into a bare repo with no upstream:
+    #
+    prj=/path/to/project
+    # Make sure we have everything committed:
+    cd ${prj}
+    git status
+    # Move repo to bare repo name:
+    mv .git ../${prj}.git
+    # Make as a bare repo:
+    cd ../${prj}.git
+    git config --bool core.bare true
+    # Remove upstreams as needed:
+    git remote rm origin
+
+    # Make a tarball of only the files changed in the HEAD commit:
+    git archive -o chages.tar HEAD $(git diff --name-only HEAD^)
+    # Make tarball of subdirectory contents:
+    git archive -o release-process.tar HEAD:release-process
+    # Make tarball of uncommitted work:
+    git archive -o test-version.tar stash@{0}
+
+    # useful:
+    firefox http://www.kernel.org/pub/software/scm/git/docs/gittutorial.html
+
+    # cat old version of a file:
+    vers=master
+    file=make-media.sh
+    git show $(git ls-tree ${vers} -- ${file} |
+	awk '{print $3}') > ${file}-${vers}
+    # or
+    git show ${vers}:${file} > ${file}-${vers}
+
+    git rebase [--interactive]
+
+    # Push a single commit:
+    # Option 1:
+	git push <remote name> <commit hash>:<remote branch name>
+	# Example:
+	git push origin 2dc2b7e393e6b712ef103eaac81050b9693395a4:master
+    # Option 2:
+	Move or work on a private branch, then cherry-pick onto the upstream
+	branch and push from that.
+
+    # Pull commits from other branch and merge w/o extra commits:
+    git pull --rebase <repo> <branch>
+    # when using local branch:
+    git pull --rebase . <branch>
+
+    # Checkout a branch, rebase and merge to master:
+    # rebases "feature" to "master" and merges it in to master
+    git checkout master	    # ommit if already on master
+    git checkout feature
+    git rebase @{-1}
+    git checkout @{-2}
+    git merge @{-1}
+
+    # alternately:
+    git checkout master	    # ommit if already on master
+    git rebase HEAD feature
+    git rebase HEAD @{-2}
+
+    # split a commit:
+    git rebase -i ${COMMIT}^
+	# Set ${COMMIT} to "edit".
+    git reset HEAD^
+    # Re-add and commit files in new groupings.
+    git rebase --continue
+
+    # Amend the first commit of a repo:
+    # On newer versions:
+    git rebase --root -i
+    # On older versions:
+    # checkout the root commit
+    git checkout <sha1-of-root>
+    # amend the commit
+    git commit --amend
+    # rebase all the other commits in master onto the amended root
+    git rebase --onto HEAD HEAD master
+
+    # Apply a patch to an old revision and then walk it forward:
+    git checkout -b temp_branch ${OLD_REV}
+    git am ${NEW_REV}.patch
+    git checkout ${MAIN_BRANCH}
+    # then this:
+    git merge . temp_branch
+    # or this:
+    git pull --rebase . temp_branch
+    # or alternately:
+    git cherry-pick temp_branch
+    # to see what has been cherry-picked:
+    git cherry -v master
+
+    # Split an old commit and bring the new part to HEAD:
+    git rebase -i ${COMMIT_ID}^
+    git reset HEAD^
+    # Select parts to keep.
+    git commit
+    # Keep unused parts.
+    git stash
+    git rebase --continue
+    git stash pop
+
+    # Undo last rebase:
+    git reflog --all
+    # This will output something like this:
+	1c98e78 refs/heads/master@{0}: rebase -i (finish): refs/heads/master onto 86d0f9
+	317e759 refs/heads/master@{1}: rebase -i (finish): refs/heads/master onto 86d0f9
+	b197487 refs/heads/master@{2}: commit: added bar.txt
+	083838a refs/heads/master@{3}: commit: more foos and bars
+    # In this case, we can see I had done two rebases -- master@{0} and
+    # master@{1} -- and two commits. Since I had not done anything after
+    # the botched rebase, which in this case is master@{0}, I can do a
+    # reset to the previous:
+    git reset --hard master@{1}
+
+    # cherry-pick all commits patching README:
+    git rev-list --reverse master -- README | git cherry-pick -n --stdin
+
+
+    # shows the last commit matching regex "fix":
+    git show :/fix
+    # shows the last merge commit:
+    git show :/^Merge
+
+
+    # Forget about a "git add" w/o lossing the changes:
+    git rm --cached <filename>
+
+
+    # Remove a revision from history:
+    COMMIT_ID=0aef4c63a4cf2a062b1a3765b9a3d5ca64202f9c
+    git rebase -m -i --onto ${COMMIT_ID}^ ${COMMIT_ID}
+    # If conflicts arise:
+    vi path/to/conflicted/file
+    git add path/to/conflicted/file
+    git rebase --continue
+
+    # To see if a particular BSP has a particular commit:
+    git branch --contains COMMIT_ID
+
+    # Clone and get onto a branch from the original:
+    git clone REPO
+    git checkout -b BRANCH origin/REMOTE_BRANCH
+
+    # Clone a local repo minimizing disk space by referencing the original:
+    git clone --reference REPO REPO MY_REPO
+    # If the base is moved, edit this file to point to its new location:
+    echo NEW_BASE_REPO_PATH > MY_REPO/objects/info/alternates
+
+    # Make a repo that is safe to screw up w/o damaging original:
+    git clone --no-hardlinks org_repo new_repo
+
+    # View the log inorder of ancestry with an ASCII graph:
+    git log --topo-order --graph
+
+    # Show log with tags and matching commit ID's.:
+    git log --pretty=oneline --decorate
+    git log --decorate
+    git log | git name-rev --stdin
+    # N.B. Above can filter any input, even an email.
+
+    # View blame for various revisions of a file:
+    git rev-list HEAD -- path/to/file
+    git blame ${rev_from_above} -- path/to/file
+    # All revs to files:
+    f=meta/recipes-connectivity/bind/bind_9.8.1.bb
+    for i in $(git rev-list HEAD $f); do
+	git blame $i -- $f > /tmp/blame.$i
+    done
+
+    # Show commit ids that tags and branches refer to:
+    git show-ref
+
+    # Highlight by word region when diffing:
+    git diff --color-words COMMIT_ID
+    git log -p --color-words COMMIT_ID
+    git show --color-words COMMIT_ID
+
+    # See a diff with possibly better chunk alignment:
+    git diff --patience
+    # Change the diff algorithm for 'git add --patch' (v1.8...):
+    git config --global diff.algorithm patience
+    # or:
+    git -c diff.algorithm=patience add -p
+
+    # uncommited file to HEAD
+    git diff <path>
+    # uncommited file to before last commit
+    git diff HEAD^ -- <path>
+    #last commit to before last commit
+    git diff HEAD^ HEAD -- <path>
+    #difference between HEAD and n-th grandparent
+    git diff HEAD~n HEAD -- <path>
+    #Another cool feature is whatchanged command
+    git whatchanged -- <path>
+
+    # make a local branch to work on a remote branch:
+    git checkout -b br_local origin/br_remote
+
+    # create a branch locally, then push it as a branch remotely:
+    # 1) Create the branch locally:
+    git checkout -b <branch-name>
+    # 2) Create the branch remotely:
+    git push -u <remote-name> <branch-name>
+    # More explicitly:
+    git push -u <remote-name> <local-branch-name>:<remote-branch-name>
+    # N.B. -u set up upstream associations so pull will work.
+
+    # How to export a patchset and apply it to another repo:
+    git format-patch --stdout START..END > /tmp/patchset.mbox
+    cd OTHER_REPO
+    git am /tmp/patchset.mbox
+
+    # remove the commit, update working tree and remove all traces of the change:
+    git reset --hard HEAD^
+    # remove the commit, but leave the files changed and staged for re-commit
+    git reset --soft HEAD^
+    # remove the commit, leave file changes, but not staged for commit
+    # --mixed is default!
+    git reset --mixed HEAD^
+
+    # Promote a subdirectory to full blown module/repo:
+    src_repo=all-in-one
+    sub_repo=submodule
+    src_repo=wrl
+    sub_repo=wrl-bsp
+    #git clone --no-hardlinks ${src_repo} ${sub_repo}.tmp
+    git clone --no-hardlinks ${src_repo} ${sub_repo}
+    #cp -a ${src_repo} ${sub_repo}.tmp
+    #cd ${sub_repo}.tmp
+    mkdir ${sub_repo}.git
+    git init --bare
+    cd ${sub_repo}.git
+    cd ..
+    cd ${sub_repo}
+    git filter-branch --subdirectory-filter ${sub_repo} -- --all
+    git reset --hard
+    # git gc --aggressive
+    # git prune
+    # git reflog expire --expire=now --all
+    git push ../${sub_repo}.git HEAD
+    #cd ..
+    #git clone ${sub_repo}.tmp ${sub_module}
+    #rm -rf ${sub_repo}.tmp 
+
+    # Promote a subdirectory to full blown module in a bare repo:
+    src_repo=all-in-one
+    sub_repo=submodule
+    git clone --no-hardlinks ${src_repo} ${sub_repo}
+    mkdir ${sub_repo}.git
+    (
+	cd ${sub_repo}.git
+	git init --bare
+    )
+    cd ${sub_repo}
+    git filter-branch --prune-empty --tag-name-filter cat \
+	--subdirectory-filter ${sub_repo} -- --all
+    git reset --hard
+    # git push --tags ../${sub_repo}.git HEAD
+    git push --tags ../${sub_repo}.git master
+
+    # Remove promoted module from original repo:
+    git filter-branch \
+	--index-filter "git rm -r -f --cached --ignore-unmatch ${sub_repo}"
+
+    # How to compare two repos:
+    repo_a=eurotech
+    repo_b=eurotech.good
+
+    git clone -n --no-hardlinks ${repo_a} repo_cmp
+    cat >> repo_cmp/.git/objects/info/alternates <<EOF
+${PWD}/${repo_a}/objects
+${PWD}/${repo_b}/objects
+EOF
+
+    pushd repo_cmp
+
+    git remote add repo_a ~1/${repo_a}
+    git remote add repo_b ~1/${repo_b}
+    git remote update
+
+    branches=$(git branch -r|grep repo_a/eurotech | cut -d/ -f2)
+    for i in ${branches}; do
+	echo "BRANCH: $i"
+	echo "     in repo_b, repo_a: $(git log repo_a/$i..repo_b/$i | wc -l)"
+	echo "     in repo_a, repo_b: $(git log repo_b/$i..repo_a/$i | wc -l)"
+    done
+    for i in ${branches}; do
+	echo "# $i:"
+	echo "# in repo_b, repo_a:"
+	git log --pretty=oneline repo_a/$i..repo_b/$i
+	echo "# in repo_a, repo_b:"
+	git log --pretty=oneline repo_b/$i..repo_a/$i
+	echo
+    done
+
+    # original example taken from: http://tinyurl.com/3e4sfu8
+    git remote add cvsimport-a git://.../cvsimport-a.git
+    git remote add cvsimport-b git://.../cvsimport-b.git
+    git remote update
+    git log cvsimport-a/master..cvsimport-b/master  # in B, not in A?
+    git log cvsimport-b/master..cvsimport-a/master  # in A, not in B?
+
+
+#########################################
+# fetching into a bare git repository (support laptop situation)
+#
+
+    # on support:
+    mkdir foo
+    cd foo
+    git init
+    # commit some stuff.
+
+    # on zest:
+    git clone --bare support:foo
+
+    # on support:
+    # commit some more stuff.
+
+    # on zest:
+    git fetch origin master:master
+
+
+#########################################
+# Exporting a release from git and adding it to CVS:
+#
+
+    git clone ~/repo-git/linux-2.6 linux-2.6.26
+    cd linux-2.6.26
+    git checkout v2.6.26
+    cvs -f import -I .git \
+	-m "Imported 2.6.26 sources from a git repo." linux LINUX LINUX_2_6_26
+    cvs rtag -b -r LINUX_2_6_26 ADS_2_6_26 linux
+
+
+#########################################
+# Recover BitsyG5 u-boot:
+#
+
+    vncviewer 192.168.1.32
+    # Login w/usual root password.
+
+    # Set S1 on BitsyG5 to ON-ON.
+    # Hook up Wiggler.
+    # Hook up RS232 to COM1.  Not COM2, the debug port.
+    # Hook up power.
+
+    # Start HyperTerminal on COM2 @ 115200.  Use "JTAG Serial" icon, if you can.
+    # Select "Programs\Maccraigor Systems\OCD Commander\OCD Commander".
+    # Press OK.
+    # Enter "conn"
+    # Press OK.
+    # Select "Commands\Download".
+    #	Choose image1.s19.
+    #	Repeat with image2.s19 and image3.s19
+    # Enter "go 0x1fffc000"
+
+    # Switch to HyperTerminal:
+    #	Press "1", and then send u-boot.bin using kermit.
+    #	Press "U" to write to the flash.
+
+    # Power off board.
+    # Switch S1 back to OFF-OFF.
+
+    # Reconnect normally.
+
+
+#########################################
+# Recover Sphere u-boot:
+#
+
+    # Put a Jumper on JP5 (between the CPU chip and the CF slot).
+    sudo ~/wrk/tools/download -b 9600 -p 1 ~/latest/sphere/u-boot.bin
+    # Turn on the board.
+    # Remove jumper and power cycle board.
+
+
+#########################################
+# Recover VGX u-boot:
+#
+
+    # Use Xilinx PC4 and 610116-10001 cable.
+
+
+#########################################
+# Recover Portal u-boot:
+#
+
+
+    # Hook up the Arium JTAG debugger to the LAN and the Portal.
+    # Power on the Portal.
+    # Power on the JTAG debugger.
+    ping 192.168.1.117
+    # Wait for ther debugger to come on-line.  *** Does this IP change? ***
+
+    cd ~/sourcepoint
+    ./runsp &
+
+    # When the UI starts, there should be a "Tracking PC" window.  If not,
+    # select "Processort>Reset".  We must be connected to procede.
+
+    # Select "File>Program Target Device>Program FLash".
+
+    # Check the options:
+    #	flash type: NOR
+    #	dev addr: 50000000P
+    #	dev type: Intel 28 Series-Big Endian *** YES, BE ***
+    #	swap endian: ***unchecked***
+
+    #	start addr: 50000000p
+    #	filename: /home/afilipi/sourcepoint/portal/u-boot-swap.bin
+
+    #	run init cmd/macro: ***checked***
+    #	cmd/macro filename: /home/afilipi/sourcepoint/Targets/Reference_Boards/IXDPG425/ixdpg425_init_big.mac
+
+    # Press "Erase" and wait a while.
+    # Press "Write" and wait a while.
+    # Press "Verify".
+
+    # Press OK
+
+
+########################################
+# Checking the ckecsum of a read file in u-boot:
+#
+
+    # Compute the checksum on a linux host:
+    jacksum -a crc32 -E hex /tmp/flashfs1
+
+    # Compute the checksum from within uboot:
+    fatload ide 0 scratch_buffer flashfs1
+    # N.B. You have to get the start address of scratch_buffer from mapinfo!
+    mapinfo
+    crc 0xa0208000 $filesize
+
+
+########################################
+# Graphing the CVS branches:
+#
+
+    cvsgraph -o cvs-br-u-boot.png -m u-boot README,v
+    cvsgraph -o cvs-br-linux.png -m linux README,v
+
+
+#########################################
+# ADS Intranet/VPN
+#
+
+# accessing the ADS Intranet:/VPN
+
+    sudo route add -net 10.73.0.0/16  gateway 192.168.1.99
+    firefox http://10.73.2.250/adsintranet
+
+    sudo route add -net 10.200.0.0/16 gateway 192.168.1.99
+    firefox http://wiki.software.eurotech.it/
+
+# ADS webmail:
+    firefox https://ads-ex01.applieddata.net/exchange/afilipi
+
+
+#########################################
+# Starting X11 w/o acceleration:
+#
+
+    export XADS_DISABLE_XV=yes
+    # Restart X server.
+
+
+#########################################
+# Disassembling a raw binary:
+#
+
+    echo > foo.c
+    arm-none-linux-gnueabi-gcc c -o foo.o foo.c
+    arm-none-linux-gnueabi-gcc -c -o foo.o foo.c
+    arm-none-linux-gnueabi-objcopy --remove-section=.text foo.o
+    arm-elf-objcopy --add-section=.text=thebinfile foo.o
+    arm-none-linux-gnueabi-objcopy --add-section=.text=BootROM.bin foo.o
+    arm-none-linux-gnueabi-objcopy --set-section-flags=.text=alloc,load,code,contents,readonly foo.o
+    arm-none-linux-gnueabi-objdump -d foo.o
+
+
+#########################################
+# Mount a disk image with partitions:
+#
+
+    # Manually do this:
+    sudo modprobe -r loop
+    sudo modprobe loop max_part=63
+    # Or add this file and reboot:
+	cat > /etc/modprobe.d/loop.conf <<EOF
+options loop max_part=63
+EOF
+
+    sudo losetup /dev/loop0 IMAGE_FILE
+    sudo sfdisk -uS -l /dev/loop0
+	# Disk /dev/loop0: cannot get geometry
+	# 
+	# Disk /dev/loop0: 234 cylinders, 255 heads, 63 sectors/track
+	# Warning: The partition table looks like it was made
+	#   for C/H/S=*/16/63 (instead of 234/255/63).
+	# For this listing I'll assume that geometry.
+	# Units = sectors of 512 bytes, counting from 0
+	# 
+	#    Device Boot    Start       End   #sectors  Id  System
+	# /dev/loop0p1   *        63   3768911    3768849  83  Linux
+	# /dev/loop0p2             0         -          0   0  Empty
+	# /dev/loop0p3             0         -          0   0  Empty
+	# /dev/loop0p4             0         -          0   0  Empty
+
+    sudo mount -o ro /dev/loop0p1 /mnt
+
+    # When done:
+    sudo umount /dev/loop0p1
+    sudo losetup -d /dev/loop0
+
+
+#########################################
+# Mount a released disk image such that it won't change the MD5:
+#
+
+    # loopdev=$(sudo losetup -r -vf *.iso | awk '{print $NF}')
+    loopdev=$(sudo losetup -r -vf *.img | awk '{print $NF}')
+    sudo kpartx -v -a ${loopdev}
+    sudo mount /dev/mapper/${loopdev##*/}p1 /mnt
+    sudo mount /dev/mapper/${loopdev##*/}p2 /mnt2
+    sudo mount /dev/mapper/${loopdev##*/}p3 /mnt3
+
+    sudo umount /mnt3
+    sudo umount /mnt2
+    sudo umount /mnt
+    sudo kpartx -v -d ${loopdev}
+    sudo losetup -d ${loopdev}
+
+    # N.B. kpartx wraps device mapper functionality that can be
+    # direcectly accessed via dmsetup.  e.g. If the partition
+    # table changes and the old partition node might be left dangling.
+    : afilipi@vigor; sudo losetup -av
+    /dev/loop0: [0811]:12214295 (/home/...../foo.img (deleted))
+    : afilipi@vigor; sudo dmsetup info loop0p5
+    Name:              loop0p5
+    State:             ACTIVE
+    /dev/mapper/loop0p5: open failed: No such file or directory
+    Tables present:    LIVE
+    Open count:        0
+    Event number:      0
+    Major, minor:      253, 5
+    Number of targets: 1
+    UUID: part5-loop0
+    : afilipi@vigor; sudo dmsetup remove loop0p5
+    : afilipi@vigor; sudo losetup -dv /dev/loop0
+
+
+#########################################
+# Mount a jffs2 image:
+#
+
+    # sudo modprobe loop
+    sudo modprobe mtdblock
+    sudo losetup /dev/loop0 flashfs1
+    sudo modprobe block2mtd erasesz=256 device=/dev/loop0
+    mknod /dev/mtdblock0 b 31 0 (if not done yet)
+    mkdir /mnt/jffs2 (example mount point, if not done yet)
+    mount t
+    jffs2 /dev/mtdblock0 /mnt/jffs2/
+
+#########################################
+# yum tips:
+#
+
+    # find packages that contain 'rup' program:
+    yum provides */rup
+
+
+#########################################
+# rpm tips:
+#
+
+    # general packaging tool tips:
+    http://www.linode.com/wiki/index.php/Linux_Packaging
+
+    # Show more info in query output:
+    rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}-%{ARCH}\n' foo
+
+    # Show packages with installation dates:
+    rpm -qa --qf '%{INSTALLTIME} %- 30{NAME}| %{INSTALLTIME:date}\n' foo
+
+    # List contents of an installed package:
+    rpm -v -ql foo
+
+    # List contents of package file:
+    rpm -v -qlp foo.rpm
+
+    # Show packages that depend upon a given package:
+    rpm -q --whatrequires libxcalibrate0
+
+    # List contents of all installed packages grouped by package:
+    rpm -qa --filesbypkg
+
+    # List all installed packages:
+    rpm -qa
+
+    # Print the name of the package containing/owning a given file:
+    rpm -qf /some/file
+
+    # Unpack an rpm or source rpm:
+    pkg=ppp-2.4.4-2.src.rpm 
+    mkdir ${pkg%.rpm}
+    rpm2cpio ${pkg} | (cd ${pkg%.rpm}; cpio -idmv)
+
+    # Given one of a set of packages in the current directory, compute
+    # set of other packages that are needed as dependcies:
+    unset pkg_list
+    pkg_list=(
+	perl-module-fcntl-5.14.3-r1.core2.rpm
+    )
+    unset deps
+    declare -A deps
+    # filter=.
+    filter=perl-module-
+    while :; do
+	npkg_list=()
+	for i in $(rpm -qRp ${pkg_list[@]} | grep ${filter}); do
+	    if ! [[ -e $(echo $i-[0-9]*) ]]; then
+		: no rpm
+		continue
+	    fi
+	    if [[ "${deps[$i]}" = 1 ]]; then
+		: already seen
+		continue
+	    fi
+	    deps[$i]=1 
+	    npkg_list+=( $i )
+	done
+	if [[ ${#npkg_list[@]} = 0 ]]; then
+	    break
+	fi
+	for i in ${npkg_list[@]}; do
+	    pkg_list+=( $(echo $i-[0-9]*) )
+	done
+    done
+    for i in ${!deps[@]}; do
+	echo $i-[0-9]*
+    done
+
+
+#########################################
+# Rebuilding nvi package locally with tweaks:
+#
+
+    # This is universal to all package bulding:
+    sudo apt-get install devscripts build-essential fakeroot
+
+    sudo apt-get build-dep nvi
+    apt-get source nvi
+
+    # Make changes:
+--- nvi-1.81.6/debian/rules.orig	2009-05-28 09:32:19.000000000 -0400
++++ nvi-1.81.6/debian/rules	2009-05-28 09:32:21.000000000 -0400
+@@ -43,7 +43,6 @@
+ 		--disable-curses \
+ 		--prefix=/usr \
+ 		--disable-shared --enable-static \
+-		--enable-widechar \
+ 		--disable-threads \
+ 		--without-x \
+ 		--with-gnu-ld=yes \
+
+    cd nvi-1.81.6 
+    debuild -us -uc
+
+
+#########################################
+# Loading hw_config.txt to an already preprogrammed board:
+#
+
+    # Put hw_config.txt on CF, MCC/SD or USB and insert it.
+
+    txt_file=hw_config.txt
+    run media_init
+    run execute_txt_file
+    saveenv
+
+
+########################################
+# Chunk to put in /etc/rc.local to automatically reboot with counting:
+
+    . /etc/reboot_count
+    let reboot_count++
+    cat <<EOF
+    ##################################################
+    ### reboot_count=${reboot_count}
+    ##################################################
+    EOF
+    echo reboot_count=${reboot_count} > /etc/reboot_count
+    reboot
+

@@ -1,0 +1,63 @@
+[user]
+	name = Adrian Filipi
+	email = adrian@ubergeeks.com
+
+[core]
+	pager = less -R
+	whitespace = trailing-spaces space-before-tab indent-with-non-tab cr-at-eol
+	excludesfile = /home/afilipi/.gitignore
+	attributesfile = /home/afilipi/.gitattributes
+
+[gui]
+	recentrepo = /home/afilipi/wrk/u-boot/u-boot-git
+
+[color]
+	ui = auto
+
+[color "diff"]
+	old  = yellow bold
+	new  = green bold
+	frag = green black
+	whitespace = black red
+	commit = yellow black
+
+[color "branch"]
+	current = green bold
+	remote = yellow bold
+
+[color "interactive"]
+	prompt = green bold
+	header = yellow black
+	help = yellow bold
+
+[diff]
+#	external = xx-git-diff
+[merge]
+#	conflictstyle = diff3
+#	tool = xxdiff
+
+
+[color "status"]
+	untracked = yellow bold
+	changed = green bold
+#           header (the header text of the status message
+#		added or updated
+#           (files which are added but not committed), 
+#changed (files which are
+#           changed but not added in the index), 
+#untracked (files which are not tracked by git), 
+#
+#or nobranch (the color the no branch warning is
+##           shown in, defaulting to red). T
+[alias]
+	human = name-rev --name-only --refs=refs/heads/*
+	tree = log --pretty=oneline --abbrev-commit --decorate --graph
+	dlog = log --decorate
+	slog = log --stat=180,180 --decorate
+	tracked = status --untracked-files=no
+	sdiff = diff --stat=180,180 -p
+[rerere]
+	enabled = true
+	autoupdate = true
+[diff "odf"]
+	textconv=odt2txt
